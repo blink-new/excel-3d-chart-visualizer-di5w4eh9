@@ -28,23 +28,40 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       const worksheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[worksheetName];
       
-      // Convert to JSON
+      // Convert to JSON with proper header handling
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
       
       if (jsonData.length === 0) {
         throw new Error('The file appears to be empty');
       }
 
-      // Convert array of arrays to array of objects
-      const headers = jsonData[0] as string[];
+      console.log('Raw JSON data:', jsonData);
+
+      // Get headers from first row, ensuring we handle all columns
+      const firstRow = jsonData[0] as any[];
+      const headers = firstRow.map((header, index) => {
+        // If header is empty or undefined, create a default column name
+        if (header === undefined || header === null || header === '') {
+          return `Column_${index + 1}`;
+        }
+        return String(header).trim();
+      });
+
+      console.log('Processed headers:', headers);
+
+      // Get data rows (skip first row which contains headers)
       const rows = jsonData.slice(1) as any[][];
       
+      // Convert rows to objects, ensuring all columns are included
       const data = rows
-        .filter(row => row.some(cell => cell !== undefined && cell !== ''))
-        .map(row => {
+        .filter(row => row && row.some(cell => cell !== undefined && cell !== null && cell !== ''))
+        .map((row, rowIndex) => {
           const obj: any = {};
-          headers.forEach((header, index) => {
-            obj[header] = row[index] || '';
+          // Process each column, even if the row is shorter than headers
+          headers.forEach((header, colIndex) => {
+            const cellValue = row[colIndex];
+            // Preserve the original value, including 0, false, etc.
+            obj[header] = cellValue !== undefined && cellValue !== null ? cellValue : '';
           });
           return obj;
         });
@@ -90,6 +107,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       { Product: 'Cameras', Q1: 45, Q2: 50, Q3: 55, Q4: 48 }
     ];
     
+    console.log('Loading sample data:', sampleData);
     setSuccess('Sample data loaded successfully');
     onFileUpload(sampleData);
   };

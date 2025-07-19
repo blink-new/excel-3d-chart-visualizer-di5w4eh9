@@ -18,7 +18,10 @@ export function DataPreview({ data, onDataProcess, onBack }: DataPreviewProps) {
 
   const columns = useMemo(() => {
     if (data.length === 0) return [];
-    return Object.keys(data[0]);
+    const cols = Object.keys(data[0]);
+    console.log('Available columns:', cols);
+    console.log('Sample data row:', data[0]);
+    return cols;
   }, [data]);
 
   const numericColumns = useMemo(() => {
