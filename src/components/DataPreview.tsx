@@ -24,26 +24,48 @@ export function DataPreview({ data, onDataProcess, onBack }: DataPreviewProps) {
   const numericColumns = useMemo(() => {
     if (data.length === 0) return [];
     return columns.filter(col => {
-      return data.some(row => {
-        const value = row[col];
-        return !isNaN(parseFloat(value)) && isFinite(value);
-      });
+      // Check if at least 50% of non-empty values in this column are numeric
+      const nonEmptyValues = data
+        .map(row => row[col])
+        .filter(val => val !== null && val !== undefined && val !== '');
+      
+      if (nonEmptyValues.length === 0) return false;
+      
+      const numericCount = nonEmptyValues.filter(val => {
+        const num = parseFloat(String(val));
+        return !isNaN(num) && isFinite(num);
+      }).length;
+      
+      return numericCount / nonEmptyValues.length >= 0.5;
     });
   }, [columns, data]);
 
-  const stringColumns = useMemo(() => {
-    if (data.length === 0) return [];
-    return columns.filter(col => !numericColumns.includes(col));
-  }, [columns, data.length, numericColumns]);
+  const allColumns = useMemo(() => {
+    return columns; // All columns available for X-axis
+  }, [columns]);
 
   const canGenerateChart = selectedXColumn && selectedYColumn;
 
   const generateChart = () => {
     if (!canGenerateChart) return;
 
+    // Filter out rows with empty or invalid data
+    const validData = data.filter(row => {
+      const xValue = row[selectedXColumn];
+      const yValue = row[selectedYColumn];
+      return xValue !== null && xValue !== undefined && xValue !== '' &&
+             yValue !== null && yValue !== undefined && yValue !== '' &&
+             !isNaN(parseFloat(String(yValue)));
+    });
+
+    if (validData.length === 0) {
+      alert('No valid data found for the selected columns. Please check your data.');
+      return;
+    }
+
     const chartData: ChartData = {
-      labels: data.map(row => String(row[selectedXColumn])),
-      values: data.map(row => parseFloat(row[selectedYColumn]) || 0)
+      labels: validData.map(row => String(row[selectedXColumn]).trim()),
+      values: validData.map(row => parseFloat(String(row[selectedYColumn])))
     };
 
     const config: ChartConfig = {
@@ -83,16 +105,21 @@ export function DataPreview({ data, onDataProcess, onBack }: DataPreviewProps) {
                 <label className="text-sm font-medium text-foreground mb-2 block">
                   X-Axis (Categories)
                 </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Choose the column for chart labels/categories
+                </p>
                 <Select value={selectedXColumn} onValueChange={setSelectedXColumn}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category column" />
                   </SelectTrigger>
                   <SelectContent>
-                    {stringColumns.map(col => (
-                      <SelectItem key={col} value={col}>{col}</SelectItem>
-                    ))}
-                    {numericColumns.map(col => (
-                      <SelectItem key={col} value={col}>{col}</SelectItem>
+                    {allColumns.map(col => (
+                      <SelectItem key={col} value={col}>
+                        {col}
+                        {numericColumns.includes(col) && (
+                          <span className="ml-1 text-xs text-muted-foreground">(numeric)</span>
+                        )}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -102,14 +129,26 @@ export function DataPreview({ data, onDataProcess, onBack }: DataPreviewProps) {
                 <label className="text-sm font-medium text-foreground mb-2 block">
                   Y-Axis (Values)
                 </label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Choose the numeric column for bar heights
+                </p>
                 <Select value={selectedYColumn} onValueChange={setSelectedYColumn}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select value column" />
+                    <SelectValue placeholder="Select numeric value column" />
                   </SelectTrigger>
                   <SelectContent>
-                    {numericColumns.map(col => (
-                      <SelectItem key={col} value={col}>{col}</SelectItem>
-                    ))}
+                    {numericColumns.length > 0 ? (
+                      numericColumns.map(col => (
+                        <SelectItem key={col} value={col}>
+                          {col}
+                          <span className="ml-1 text-xs text-muted-foreground">(numeric)</span>
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        No numeric columns found
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
